@@ -1,0 +1,12 @@
+target/
+.idea/
+.vscode/
+*.iml
+*.class
+
+# IMPORTANTE: no subir credenciales de AWS al repositorio
+src/main/resources/application.yml
+
+# Auxiliares de prueba / generacion de evidencia (no forman parte del proyecto)
+*.ps1
+resumen_*_descargado.txt

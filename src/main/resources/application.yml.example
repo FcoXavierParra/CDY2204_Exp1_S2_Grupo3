@@ -1,0 +1,12 @@
+server:
+  port: 8080
+
+aws:
+  # Credenciales del lab de AWS Academy (AWS Details -> AWS CLI).
+  # Caducan al reiniciar el lab: copia los valores frescos en cada sesion.
+  # NUNCA subas este archivo con credenciales reales: usa application.yml (ignorado por git).
+  access-key: TU_AWS_ACCESS_KEY_ID
+  secret-key: TU_AWS_SECRET_ACCESS_KEY
+  session-token: TU_AWS_SESSION_TOKEN
+  region: us-east-1
+  bucket: cdy2204-fparra-s3

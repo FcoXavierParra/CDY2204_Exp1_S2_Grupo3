@@ -1,0 +1,83 @@
+{
+  "info": {
+    "name": "CDY2204 - Exp1 S2 - bdget S3",
+    "description": "Pruebas de los endpoints de gestion de resumenes de inscripcion en AWS S3 (Spring Boot). Base: {{baseUrl}}",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "numeroResumen", "value": "1001" }
+  ],
+  "item": [
+    {
+      "name": "1. POST - Generar y subir resumen",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"numeroResumen\": \"1001\",\n  \"nombreEstudiante\": \"Ean Perez\",\n  \"curso\": \"Cloud Native\",\n  \"fecha\": \"2026-06-01\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/s3/inscripcion",
+          "host": [ "{{baseUrl}}" ],
+          "path": [ "s3", "inscripcion" ]
+        },
+        "description": "Genera el archivo resumen_1001.txt y lo sube a la carpeta 1001/ del bucket."
+      }
+    },
+    {
+      "name": "2. PUT - Modificar / reemplazar resumen",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"numeroResumen\": \"1001\",\n  \"nombreEstudiante\": \"Ean Perez Soto\",\n  \"curso\": \"Cloud Native\",\n  \"fecha\": \"2026-06-01\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/s3/inscripcion",
+          "host": [ "{{baseUrl}}" ],
+          "path": [ "s3", "inscripcion" ]
+        },
+        "description": "Regenera el resumen con un dato modificado y reemplaza el objeto en S3."
+      }
+    },
+    {
+      "name": "3. GET - Descargar resumen",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/s3/download?numeroResumen={{numeroResumen}}",
+          "host": [ "{{baseUrl}}" ],
+          "path": [ "s3", "download" ],
+          "query": [
+            { "key": "numeroResumen", "value": "{{numeroResumen}}" }
+          ]
+        },
+        "description": "Descarga resumen_1001.txt. Para guardarlo: Send -> Save response -> Save to a file."
+      }
+    },
+    {
+      "name": "4. DELETE - Borrar resumen",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/s3/inscripcion?numeroResumen={{numeroResumen}}",
+          "host": [ "{{baseUrl}}" ],
+          "path": [ "s3", "inscripcion" ],
+          "query": [
+            { "key": "numeroResumen", "value": "{{numeroResumen}}" }
+          ]
+        },
+        "description": "Elimina el objeto 1001/resumen_1001.txt del bucket."
+      }
+    }
+  ]
+}
