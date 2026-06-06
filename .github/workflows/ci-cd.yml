@@ -1,4 +1,4 @@
-name: CI/CD
+name: CI/CD - Build and Push Docker Image
 
 on:
   push:
@@ -6,45 +6,58 @@ on:
       - main
 
 jobs:
-  build-and-publish:
+  build-and-deploy:
     runs-on: ubuntu-latest
+
+    # secrets no puede usarse dentro de un if:, por eso lo mapeamos a env
+    # para condicionar el despliegue a EC2 solo cuando hay una instancia configurada.
+    env:
+      EC2_HOST: ${{ secrets.EC2_HOST }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - name: Build with Maven
-        run: mvn -B package -DskipTests
-
+      # Paso 1: autenticar en Docker Hub
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # Paso 2: construir la imagen (el Dockerfile multi-stage compila con Maven)
       - name: Build Docker image
-        run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/s3-grupo3:${{ github.sha }} .
+        run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/s3-grupo3:latest .
 
+      # Paso 3: publicar la imagen en Docker Hub
       - name: Push Docker image
-        run: |
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/s3-grupo3:${{ github.sha }}
+        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/s3-grupo3:latest
 
+      # Paso 4: preparar la llave SSH (solo si hay una EC2 configurada)
+      - name: Add SSH key
+        if: ${{ env.EC2_HOST != '' }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      # Paso 5: desplegar en EC2 (pull de la imagen + run con credenciales AWS y EFS montado)
       - name: Deploy to EC2
-        if: ${{ secrets.EC2_HOST && secrets.EC2_USER && secrets.EC2_SSH_KEY }}
-        uses: appleboy/ssh-action@v0.1.9
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/s3-grupo3:${{ github.sha }}
-            docker stop s3-grupo3 || true
-            docker rm s3-grupo3 || true
-            docker run -d --name s3-grupo3 -p 8080:8080 ${{ secrets.DOCKERHUB_USERNAME }}/s3-grupo3:${{ github.sha }}
+        if: ${{ env.EC2_HOST != '' }}
+        run: |
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            ${{ secrets.USER_SERVER }}@${{ secrets.EC2_HOST }} << 'EOF'
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/s3-grupo3:latest
+          docker stop s3-grupo3 || true && docker rm s3-grupo3 || true
+          sudo mkdir -p /mnt/efs
+          docker run -d --name s3-grupo3 -p 8080:8080 \
+            -e AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
+            -e AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+            -e AWS_SESSION_TOKEN="${{ secrets.AWS_SESSION_TOKEN }}" \
+            -e AWS_REGION="us-east-1" \
+            -e AWS_BUCKET="${{ secrets.AWS_BUCKET }}" \
+            -e EFS_PATH="/app/efs" \
+            -v /mnt/efs:/app/efs \
+            ${{ secrets.DOCKERHUB_USERNAME }}/s3-grupo3:latest
+          EOF
