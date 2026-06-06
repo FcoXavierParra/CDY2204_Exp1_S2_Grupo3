@@ -1,83 +1,99 @@
-# CDY2204 – Semana 2: Almacenando archivos en la nube (AWS S3)
+# CDY2204 – Semana 3: Entrega S3_Grupo3
 
-Código S3 para el proyecto **bdget** (el microservicio Java de la Semana 1, repo base
-`https://github.com/cvalverd/bdget`). Genera el resumen de una inscripción (archivo TXT)
-y lo gestiona en un bucket de AWS S3. Cada resumen se guarda en una carpeta del bucket
-cuyo nombre es el **número del resumen**. Paquete: `com.example.bdget`.
+Proyecto base adaptado para el caso de guías de despacho con almacenamiento temporal en
+EFS y persistencia final en AWS S3. El microservicio se desarrolla con Spring Boot y
+puede desplegarse con Docker + GitHub Actions.
 
-## Dos caminos
+## Qué hay en este proyecto
 
-**Camino A – Tienes el proyecto bdget de la Semana 1 (recomendado):**
-Copia estas 4 clases dentro de tu proyecto existente, respetando el paquete `com.example.bdget`:
-
-```
-config/StorageConfig.java
-model/Inscripcion.java
-service/ResumenService.java
-service/S3Service.java
-controller/AwsController.java
-```
-
-Luego añade al `pom.xml` la dependencia `software.amazon.awssdk:s3` y Lombok (ver el
-`pom.xml` de este zip), y agrega el bloque `aws:` a tu `application.yml`. No necesitas
-tocar tu endpoint `/students` ni el pipeline CI/CD: la demo de S3 se hace localmente.
-
-**Camino B – No tienes bdget / prefieres standalone:**
-Usa este proyecto tal cual; ya es ejecutable por sí solo.
+- `config/StorageConfig.java`: configuración del cliente AWS S3.
+- `model/GuiaDespacho.java`: modelo de la guía de despacho.
+- `service/EfsStorageService.java`: escribe la guía en un directorio montado de EFS.
+- `service/S3Service.java`: sube, descarga, borra y lista objetos en S3.
+- `service/GuiaService.java`: orquesta creación, subida, actualización y consulta.
+- `controller/GuiaController.java`: endpoints REST para el nuevo caso de uso.
+- `Dockerfile`: construye la imagen Docker del servicio.
+- `.github/workflows/ci-cd.yml`: workflow de GitHub Actions para build, push y deploy.
 
 ## Requisitos
 
-- Java 17 (el bdget original usa Java 22 en su Dockerfile; ambos sirven para correr local)
-- Maven
-- Lab de **AWS Academy** encendido con un bucket S3 creado
+- Java 17
+- Maven (local o en CI)
+- Cuenta AWS con S3 y EFS
+- Repositorio en GitHub
+- Docker Hub para publicar la imagen (puede ser privado)
+- Instancia EC2 para despliegue automático (opcional)
+
+> Si aún no tienes Docker Hub, crea el repositorio `s3-grupo3` en tu cuenta.
+> Si el repositorio es privado, documenta ese detalle en el informe y asegúrate de que el despliegue automático tenga acceso mediante los secretos de GitHub.
 
 ## Configuración
 
-1. Enciende el lab de AWS Academy → **AWS Details → AWS CLI**.
-2. Copia `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`.
-3. Pega esos valores y el nombre de tu bucket en `src/main/resources/application.yml`.
+1. Reutiliza el bucket S3 existente `cdy2204-fparra-s3`.
+   - No hace falta crear un bucket nuevo.
+   - Solo cambia la estructura interna de carpetas para el caso de guías.
+2. Configura `efs.path` como directorio local para desarrollo o la ruta montada en EC2.
+3. En AWS puedes usar credenciales en variables de entorno o una IAM role en EC2.
 
-> Las credenciales **caducan** al reiniciar el lab: hay que volver a pegarlas.
-> `application.yml` está en `.gitignore` para no subir credenciales al repo.
+```yaml
+server:
+  port: 8080
 
-## Ejecutar
+aws:
+  region: us-east-1
+  bucket: cdy2204-fparra-s3
+
+efs:
+  path: ./efs-mount
+```
+
+### Nota sobre configuraciones adicionales
+
+- El bucket S3 existente no requiere configuraciones especiales distintas. Solo necesita permisos normales de lectura/escritura para la aplicación.
+- Lo único adicional es el uso de EFS para almacenamiento temporal, que no está en el bucket.
+- Si llegas a crear un nuevo bucket, debe tener el mismo `region` y permisos S3 equivalentes.
+
+## Ejecutar localmente
 
 ```bash
 mvn clean spring-boot:run
 ```
 
-App en `http://localhost:8080`.
+La aplicación quedará disponible en `http://localhost:8080`.
 
 ## Endpoints
 
 | Acción | Método | URL | Parámetros |
 |---|---|---|---|
-| Generar + subir resumen | POST | `/s3/inscripcion` | body JSON `Inscripcion` |
-| Modificar / reemplazar | PUT | `/s3/inscripcion` | body JSON `Inscripcion` |
-| Descargar | GET | `/s3/download` | `?numeroResumen=1001` |
-| Borrar | DELETE | `/s3/inscripcion` | `?numeroResumen=1001` |
+| Crear guía en EFS | POST | `/guias` | body JSON `GuiaDespacho` |
+| Subir guía a S3 | POST | `/guias/{idGuia}/upload` | body JSON `GuiaDespacho` |
+| Actualizar guía | PUT | `/guias/{idGuia}` | body JSON `GuiaDespacho` |
+| Descargar guía | GET | `/guias/{idGuia}/download` | `fecha`, `transportista` |
+| Borrar guía | DELETE | `/guias/{idGuia}` | `fecha`, `transportista` |
+| Listar guías | GET | `/guias` | `fecha`, `transportista` |
 
-### Ejemplo de body (POST / PUT)
+### Ejemplo de body `GuiaDespacho`
 
 ```json
 {
-  "numeroResumen": "1001",
-  "nombreEstudiante": "Ean Perez",
-  "curso": "Cloud Native",
-  "fecha": "2026-06-01"
+  "idGuia": "1234",
+  "transportista": "transportistaA",
+  "fecha": "20261101",
+  "pedido": "Pedido 1001",
+  "destino": "Santiago",
+  "datosAdicionales": "Entrega mañana a primera hora"
 }
 ```
 
-## Pruebas en Postman (orden para el video)
+## Flujo de despliegue
 
-1. **POST** `/s3/inscripcion` → verifica la carpeta `1001/` con `resumen_1001.txt` en la consola S3.
-2. **PUT** `/s3/inscripcion` (cambia un dato) → muestra el archivo actualizado.
-3. **GET** `/s3/download?numeroResumen=1001` → "Save Response → Save to a file".
-4. **DELETE** `/s3/inscripcion?numeroResumen=1001` → muestra que la carpeta queda vacía.
+1. Push a `main` en GitHub.
+2. GitHub Actions construye la app con Maven.
+3. Se construye y publica la imagen Docker en Docker Hub.
+4. Si están configurados los secretos `EC2_HOST`, `EC2_USER` y `EC2_SSH_KEY`, se despliega en EC2.
 
-## Nota sobre el caso
+## Próximos pasos
 
-El caso de la Semana 2 menciona "la funcionalidad de creación de resumen de la inscripción,
-correspondiente a la semana 1". El repo base `bdget` es en realidad un microservicio de
-estudiantes con BD en la nube, así que la función de generar el resumen se implementa aquí
-(`ResumenService`) adaptada al caso de la plataforma de inscripción.
+- Validar recursos AWS: bucket S3, EFS y EC2.
+- Configurar secretos en GitHub (`DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`, `EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`).
+- Ajustar el formato de archivo si se requiere PDF real en lugar de texto con extensión `.pdf`.

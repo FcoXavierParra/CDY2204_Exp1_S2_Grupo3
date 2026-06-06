@@ -8,13 +8,17 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.S3Object;
 
 import java.io.File;
+import java.util.List;
 
 /**
- * Operaciones contra AWS S3: subir, descargar y borrar.
- * La carpeta del objeto corresponde al numero del resumen.
+ * Operaciones contra AWS S3: subir, descargar, borrar y listar objetos.
+ * La clave de S3 se construye en base a la estructura de carpetas requerida.
  */
 @Service
 public class S3Service {
@@ -22,12 +26,7 @@ public class S3Service {
     @Autowired
     private S3Client s3Client;
 
-    private String buildKey(String numeroResumen, String fileName) {
-        return numeroResumen + "/" + fileName;
-    }
-
-    public String uploadFile(String bucket, String numeroResumen, File file) {
-        String key = buildKey(numeroResumen, file.getName());
+    public String uploadFile(String bucket, String key, File file) {
         s3Client.putObject(
                 PutObjectRequest.builder().bucket(bucket).key(key).build(),
                 RequestBody.fromFile(file));
@@ -47,5 +46,15 @@ public class S3Service {
         s3Client.deleteObject(
                 DeleteObjectRequest.builder().bucket(bucket).key(key).build());
         return "Archivo eliminado: " + key;
+    }
+
+    public List<S3Object> listFiles(String bucket, String prefix) {
+        ListObjectsV2Request.Builder requestBuilder = ListObjectsV2Request.builder().bucket(bucket);
+        if (prefix != null && !prefix.isBlank()) {
+            requestBuilder.prefix(prefix);
+        }
+
+        ListObjectsV2Response response = s3Client.listObjectsV2(requestBuilder.build());
+        return response.contents();
     }
 }

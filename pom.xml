@@ -12,10 +12,10 @@
     </parent>
 
     <groupId>com.example</groupId>
-    <artifactId>bdget</artifactId>
+    <artifactId>s3-grupo3</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>bdget</name>
-    <description>CDY2204 Semana 2 - Almacenando archivos en la nube (AWS S3)</description>
+    <name>s3-grupo3</name>
+    <description>CDY2204 Semana 3 - Construyendo y desplegando solución Cloud Native con EFS y S3</description>
 
     <properties>
         <java.version>17</java.version>
