@@ -1,16 +1,18 @@
 {
   "info": {
-    "name": "CDY2204 - Exp1 S2 - bdget S3",
-    "description": "Pruebas de los endpoints de gestion de resumenes de inscripcion en AWS S3 (Spring Boot). Base: {{baseUrl}}",
+    "name": "CDY2204 - Exp1 S3 - S3_Grupo3 (Guias de Despacho)",
+    "description": "Pruebas de los endpoints del Sistema de Gestion de Guias de Despacho (Spring Boot + EFS + S3). Base: {{baseUrl}}. Flujo sugerido: 1 crear -> 2 subir -> 3 listar -> 4 descargar -> 5 actualizar -> 6 eliminar.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:8080" },
-    { "key": "numeroResumen", "value": "1001" }
+    { "key": "baseUrl", "value": "http://107.23.67.117:8080" },
+    { "key": "idGuia", "value": "1001" },
+    { "key": "fecha", "value": "2026-06-07" },
+    { "key": "transportista", "value": "transportistaX" }
   ],
   "item": [
     {
-      "name": "1. POST - Generar y subir resumen",
+      "name": "1. POST - Crear guia (EFS)",
       "request": {
         "method": "POST",
         "header": [
@@ -18,18 +20,69 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"numeroResumen\": \"1001\",\n  \"nombreEstudiante\": \"Ean Perez\",\n  \"curso\": \"Cloud Native\",\n  \"fecha\": \"2026-06-01\"\n}"
+          "raw": "{\n  \"idGuia\": \"{{idGuia}}\",\n  \"transportista\": \"{{transportista}}\",\n  \"fecha\": \"{{fecha}}\",\n  \"pedido\": \"PED-5001\",\n  \"destino\": \"Santiago\",\n  \"datosAdicionales\": \"Caja fragil\"\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/s3/inscripcion",
+          "raw": "{{baseUrl}}/guias",
           "host": [ "{{baseUrl}}" ],
-          "path": [ "s3", "inscripcion" ]
+          "path": [ "guias" ]
         },
-        "description": "Genera el archivo resumen_1001.txt y lo sube a la carpeta 1001/ del bucket."
+        "description": "Crea la guia y la escribe en el EFS (/app/efs/{fecha}/{transportista}/guia_{id}.pdf). Criterio 1."
       }
     },
     {
-      "name": "2. PUT - Modificar / reemplazar resumen",
+      "name": "2. POST - Subir guia a S3",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/guias/{{idGuia}}/upload?fecha={{fecha}}&transportista={{transportista}}",
+          "host": [ "{{baseUrl}}" ],
+          "path": [ "guias", "{{idGuia}}", "upload" ],
+          "query": [
+            { "key": "fecha", "value": "{{fecha}}" },
+            { "key": "transportista", "value": "{{transportista}}" }
+          ]
+        },
+        "description": "Sube a S3 la guia YA creada en EFS en el paso 1 (la ubica por id/fecha/transportista). Sin body. Criterio 2."
+      }
+    },
+    {
+      "name": "3. GET - Consultar / listar guias",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/guias?fecha={{fecha}}&transportista={{transportista}}",
+          "host": [ "{{baseUrl}}" ],
+          "path": [ "guias" ],
+          "query": [
+            { "key": "fecha", "value": "{{fecha}}" },
+            { "key": "transportista", "value": "{{transportista}}" }
+          ]
+        },
+        "description": "Lista las guias en S3 filtrando por fecha y transportista. Criterio 5. (Puedes quitar los query params para listar todo.)"
+      }
+    },
+    {
+      "name": "4. GET - Descargar guia",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/guias/{{idGuia}}/download?fecha={{fecha}}&transportista={{transportista}}",
+          "host": [ "{{baseUrl}}" ],
+          "path": [ "guias", "{{idGuia}}", "download" ],
+          "query": [
+            { "key": "fecha", "value": "{{fecha}}" },
+            { "key": "transportista", "value": "{{transportista}}" }
+          ]
+        },
+        "description": "Descarga la guia desde S3. Criterio 4. Para guardarla: Send -> Save response -> Save to a file."
+      }
+    },
+    {
+      "name": "5. PUT - Actualizar guia",
       "request": {
         "method": "PUT",
         "header": [
@@ -37,46 +90,31 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"numeroResumen\": \"1001\",\n  \"nombreEstudiante\": \"Ean Perez Soto\",\n  \"curso\": \"Cloud Native\",\n  \"fecha\": \"2026-06-01\"\n}"
+          "raw": "{\n  \"transportista\": \"{{transportista}}\",\n  \"fecha\": \"{{fecha}}\",\n  \"pedido\": \"PED-5001\",\n  \"destino\": \"Concepcion\",\n  \"datosAdicionales\": \"Destino corregido\"\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/s3/inscripcion",
+          "raw": "{{baseUrl}}/guias/{{idGuia}}",
           "host": [ "{{baseUrl}}" ],
-          "path": [ "s3", "inscripcion" ]
+          "path": [ "guias", "{{idGuia}}" ]
         },
-        "description": "Regenera el resumen con un dato modificado y reemplaza el objeto en S3."
+        "description": "Regenera la guia con un dato modificado y reemplaza el objeto en S3. Criterio 3."
       }
     },
     {
-      "name": "3. GET - Descargar resumen",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/s3/download?numeroResumen={{numeroResumen}}",
-          "host": [ "{{baseUrl}}" ],
-          "path": [ "s3", "download" ],
-          "query": [
-            { "key": "numeroResumen", "value": "{{numeroResumen}}" }
-          ]
-        },
-        "description": "Descarga resumen_1001.txt. Para guardarlo: Send -> Save response -> Save to a file."
-      }
-    },
-    {
-      "name": "4. DELETE - Borrar resumen",
+      "name": "6. DELETE - Eliminar guia",
       "request": {
         "method": "DELETE",
         "header": [],
         "url": {
-          "raw": "{{baseUrl}}/s3/inscripcion?numeroResumen={{numeroResumen}}",
+          "raw": "{{baseUrl}}/guias/{{idGuia}}?fecha={{fecha}}&transportista={{transportista}}",
           "host": [ "{{baseUrl}}" ],
-          "path": [ "s3", "inscripcion" ],
+          "path": [ "guias", "{{idGuia}}" ],
           "query": [
-            { "key": "numeroResumen", "value": "{{numeroResumen}}" }
+            { "key": "fecha", "value": "{{fecha}}" },
+            { "key": "transportista", "value": "{{transportista}}" }
           ]
         },
-        "description": "Elimina el objeto 1001/resumen_1001.txt del bucket."
+        "description": "Elimina la guia del bucket S3."
       }
     }
   ]

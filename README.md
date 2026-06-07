@@ -66,7 +66,7 @@ La aplicación quedará disponible en `http://localhost:8080`.
 | Acción | Método | URL | Parámetros |
 |---|---|---|---|
 | Crear guía en EFS | POST | `/guias` | body JSON `GuiaDespacho` |
-| Subir guía a S3 | POST | `/guias/{idGuia}/upload` | body JSON `GuiaDespacho` |
+| Subir guía a S3 | POST | `/guias/{idGuia}/upload` | `fecha`, `transportista` (sube a S3 la guía ya creada en EFS) |
 | Actualizar guía | PUT | `/guias/{idGuia}` | body JSON `GuiaDespacho` |
 | Descargar guía | GET | `/guias/{idGuia}/download` | `fecha`, `transportista` |
 | Borrar guía | DELETE | `/guias/{idGuia}` | `fecha`, `transportista` |
@@ -88,12 +88,25 @@ La aplicación quedará disponible en `http://localhost:8080`.
 ## Flujo de despliegue
 
 1. Push a `main` en GitHub.
-2. GitHub Actions construye la app con Maven.
-3. Se construye y publica la imagen Docker en Docker Hub.
-4. Si están configurados los secretos `EC2_HOST`, `EC2_USER` y `EC2_SSH_KEY`, se despliega en EC2.
+2. GitHub Actions construye la imagen con el Dockerfile multi-stage (compila con Maven dentro de la imagen).
+3. Se publica la imagen Docker en Docker Hub (`fcoxvrparraa/s3-grupo3:latest`).
+4. Si está configurado el secreto `EC2_HOST`, se despliega por SSH en la EC2: `docker pull` + `docker run` con las credenciales AWS y el EFS montado (`-v /mnt/efs:/app/efs`).
+
+## Secretos requeridos en GitHub (Settings → Secrets and variables → Actions)
+
+| Secret | Valor |
+|---|---|
+| `DOCKERHUB_USERNAME` | usuario de Docker Hub |
+| `DOCKERHUB_TOKEN` | token de acceso de Docker Hub (read/write) |
+| `EC2_HOST` | IP elástica de la EC2 |
+| `USER_SERVER` | usuario SSH (`ec2-user`) |
+| `EC2_SSH_KEY` | contenido completo de la llave privada `.pem` |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN` | credenciales del Learner Lab (rotan al reiniciar) |
+| `AWS_BUCKET` | nombre del bucket S3 (`cdy2204-fparra-s3`) |
+
+> Las credenciales `AWS_*` del Learner Lab caducan al reiniciar el lab: actualízalas y vuelve a disparar el deploy.
 
 ## Próximos pasos
 
 - Validar recursos AWS: bucket S3, EFS y EC2.
-- Configurar secretos en GitHub (`DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`, `EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`).
 - Ajustar el formato de archivo si se requiere PDF real en lugar de texto con extensión `.pdf`.

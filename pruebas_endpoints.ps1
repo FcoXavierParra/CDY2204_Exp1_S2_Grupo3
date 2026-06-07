@@ -1,9 +1,12 @@
-# Pruebas de los endpoints S3 - CDY2204 Exp1 S2
-# Ejecutar con la app corriendo en http://localhost:8080
+# Pruebas de los endpoints de Guias de Despacho - CDY2204 Exp1 S3
+# Ejecutar con la app corriendo (local o EC2).
 # Uso: powershell -ExecutionPolicy Bypass -File .\pruebas_endpoints.ps1
+# Cambia $base a http://107.23.67.117:8080 para probar contra la EC2 desplegada.
 
-$base = "http://localhost:8080"
-$num  = "1001"
+$base          = "http://localhost:8080"
+$idGuia        = "1001"
+$fecha         = "2026-06-07"
+$transportista = "transportistaX"
 
 function Titulo($t) {
     Write-Host ""
@@ -12,40 +15,54 @@ function Titulo($t) {
     Write-Host ("=" * 60) -ForegroundColor Cyan
 }
 
-# 1. POST - Generar y subir el resumen
-Titulo "1) POST /s3/inscripcion  -> generar y subir resumen"
-$bodyPost = @{
-    numeroResumen    = $num
-    nombreEstudiante = "Francisco Javier Parra Andia"
-    curso            = "Cloud Native"
-    fecha            = "2026-06-01"
+$guia = @{
+    idGuia           = $idGuia
+    transportista    = $transportista
+    fecha            = $fecha
+    pedido           = "PED-5001"
+    destino          = "Santiago"
+    datosAdicionales = "Caja fragil"
 } | ConvertTo-Json
-Write-Host "Body enviado:" -ForegroundColor Yellow
-Write-Host $bodyPost
-$r1 = Invoke-RestMethod -Uri "$base/s3/inscripcion" -Method Post -ContentType "application/json" -Body $bodyPost
-Write-Host "Respuesta: $r1" -ForegroundColor Green
 
-# 2. PUT - Modificar / reemplazar el resumen
-Titulo "2) PUT /s3/inscripcion  -> modificar / reemplazar resumen"
-$bodyPut = @{
-    numeroResumen    = $num
-    nombreEstudiante = "Francisco Javier Parra Andia"
-    curso            = "Cloud Native - Seccion 002"
-    fecha            = "2026-06-01"
+# 1. POST - Crear guia (se escribe en EFS) -> Criterio 1
+Titulo "1) POST /guias  -> crear guia en EFS"
+$r = Invoke-RestMethod -Uri "$base/guias" -Method Post -ContentType "application/json" -Body $guia
+Write-Host "Respuesta: $r" -ForegroundColor Green
+
+# 2. POST - Subir a S3 la guia ya creada en EFS (sin body) -> Criterio 2
+Titulo "2) POST /guias/$idGuia/upload  -> subir a S3 lo creado en EFS"
+$r = Invoke-RestMethod -Uri "$base/guias/$idGuia/upload?fecha=$fecha&transportista=$transportista" -Method Post
+Write-Host "Respuesta: $r" -ForegroundColor Green
+
+# 3. GET - Consultar / listar -> Criterio 5
+Titulo "3) GET /guias  -> listar por fecha y transportista"
+$r = Invoke-RestMethod -Uri "$base/guias?fecha=$fecha&transportista=$transportista" -Method Get
+Write-Host "Guias:" -ForegroundColor Green
+$r | ForEach-Object { Write-Host "  - $_" }
+
+# 4. GET - Descargar -> Criterio 4
+Titulo "4) GET /guias/$idGuia/download  -> descargar de S3"
+$destino = Join-Path $PSScriptRoot "guia_$idGuia.descargada.pdf"
+Invoke-RestMethod -Uri "$base/guias/$idGuia/download?fecha=$fecha&transportista=$transportista" -Method Get -OutFile $destino
+Write-Host "Descargada en: $destino" -ForegroundColor Green
+Get-Content $destino | ForEach-Object { Write-Host "  $_" }
+
+# 5. PUT - Actualizar -> Criterio 3
+Titulo "5) PUT /guias/$idGuia  -> actualizar guia en S3"
+$guiaUpd = @{
+    transportista    = $transportista
+    fecha            = $fecha
+    pedido           = "PED-5001"
+    destino          = "Concepcion"
+    datosAdicionales = "Destino corregido"
 } | ConvertTo-Json
-Write-Host "Body enviado (dato modificado: curso):" -ForegroundColor Yellow
-Write-Host $bodyPut
-$r2 = Invoke-RestMethod -Uri "$base/s3/inscripcion" -Method Put -ContentType "application/json" -Body $bodyPut
-Write-Host "Respuesta: $r2" -ForegroundColor Green
+$r = Invoke-RestMethod -Uri "$base/guias/$idGuia" -Method Put -ContentType "application/json" -Body $guiaUpd
+Write-Host "Respuesta: $r" -ForegroundColor Green
 
-# 3. GET - Descargar el resumen y mostrar su contenido
-Titulo "3) GET /s3/download  -> descargar resumen"
-$destino = Join-Path $PSScriptRoot "resumen_$num`_descargado.txt"
-Invoke-RestMethod -Uri "$base/s3/download?numeroResumen=$num" -Method Get -OutFile $destino
-Write-Host "Archivo descargado en: $destino" -ForegroundColor Green
-Write-Host "Contenido del archivo:" -ForegroundColor Yellow
-Get-Content $destino | ForEach-Object { Write-Host "   $_" }
+# 6. DELETE - Eliminar
+Titulo "6) DELETE /guias/$idGuia  -> eliminar de S3"
+$r = Invoke-RestMethod -Uri "$base/guias/$idGuia?fecha=$fecha&transportista=$transportista" -Method Delete
+Write-Host "Respuesta: $r" -ForegroundColor Green
 
 Write-Host ""
-Write-Host "LISTO: ahora revisa la carpeta $num/ en la consola S3 y captura." -ForegroundColor Magenta
-Write-Host "Cuando hayas capturado, ejecuta: .\borrar_endpoint.ps1" -ForegroundColor Magenta
+Write-Host "Pruebas finalizadas." -ForegroundColor Yellow

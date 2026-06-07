@@ -26,9 +26,13 @@ public class GuiaService {
         return efsStorageService.writeGuideToEfs(guia);
     }
 
-    public String uploadGuide(GuiaDespacho guia) throws Exception {
-        File guideFile = efsStorageService.writeGuideToEfs(guia);
-        String key = String.join("/", guia.getFecha(), guia.getTransportista(), guideFile.getName());
+    public String uploadGuide(String fecha, String transportista, String idGuia) throws Exception {
+        File guideFile = efsStorageService.getGuideFile(fecha, transportista, idGuia);
+        if (!guideFile.exists()) {
+            throw new RuntimeException(
+                    "La guía no existe en EFS. Primero créala con POST /guias antes de subirla a S3.");
+        }
+        String key = buildS3Key(fecha, transportista, idGuia);
         return s3Service.uploadFile(bucket, key, guideFile);
     }
 

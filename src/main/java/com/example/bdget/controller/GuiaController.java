@@ -25,9 +25,11 @@ public class GuiaController {
     }
 
     @PostMapping("/{idGuia}/upload")
-    public ResponseEntity<String> subirGuia(@PathVariable String idGuia, @RequestBody GuiaDespacho guia) throws Exception {
-        guia.setIdGuia(idGuia);
-        String key = guiaService.uploadGuide(guia);
+    public ResponseEntity<String> subirGuia(
+            @PathVariable String idGuia,
+            @RequestParam String fecha,
+            @RequestParam String transportista) throws Exception {
+        String key = guiaService.uploadGuide(fecha, transportista, idGuia);
         return ResponseEntity.ok("Guía subida a S3 en: " + key);
     }
 

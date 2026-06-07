@@ -38,4 +38,13 @@ public class EfsStorageService {
 
         return guidePath.toFile();
     }
+
+    /**
+     * Localiza (sin reescribir) el archivo de una guía ya generada en EFS,
+     * para subirlo a S3. La ruta sigue la misma convención fecha/transportista.
+     */
+    public File getGuideFile(String fecha, String transportista, String idGuia) {
+        String fileName = "guia_" + idGuia + ".pdf";
+        return Paths.get(efsRootPath, fecha, transportista, fileName).toFile();
+    }
 }
